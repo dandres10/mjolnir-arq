@@ -1,7 +1,0 @@
-LICENSE
-README.md
-setup.py
-mjolnir_arq.egg-info/PKG-INFO
-mjolnir_arq.egg-info/SOURCES.txt
-mjolnir_arq.egg-info/dependency_links.txt
-mjolnir_arq.egg-info/top_level.txt
