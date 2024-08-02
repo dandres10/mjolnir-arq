@@ -4,7 +4,7 @@ from setuptools import setup, find_packages
 
 setup(
     name='mjolnir_arq',
-    version='0.0.2',
+    version='0.0.4',
     description='A simple example package',
     long_description=open('README.md').read(),
     long_description_content_type='text/markdown',
@@ -20,7 +20,7 @@ setup(
     python_requires='>=3.6',
     entry_points={
         'console_scripts': [
-            'mj=mjolnir_arq.module:hello_world',  
+            'mj=mjolnir_arq.module:main',  
         ],
     },
 )
