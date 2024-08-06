@@ -49,3 +49,6 @@ class FileManager:
 
         os.remove(file_path)
         print(f"Archivo '{file_path}' eliminado con éxito.")
+
+    def file_exists(self, file_path: str):
+        return os.path.exists(file_path)

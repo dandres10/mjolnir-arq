@@ -56,40 +56,55 @@ class MjolnirBusiness:
         if not result:
             return
 
-    def domain_models_entities(self, name_table: str):
-        result = self.directory_exists_entities(name_table=name_table)
+        result = self.domain_services_repositories_entities(name_table=name_table)
         if not result:
-            return False
-        self.create_directory_entity(name_table=name_table)
+            return
 
-        entity_base = self.create_entity_base(name_table=name_table)
-        self.file_manager.create_file(
-            file_path=f"{self.current_directory}/src/domain/models/entities/{name_table}/{name_table}.py",
-            content=entity_base,
+    def domain_models_entities(self, name_table: str) -> bool:
+        base_path = os.path.join(
+            self.current_directory, "src", "domain", "models", "entities", name_table
         )
-        entity_save = self.create_entity_save(name_table=name_table)
-        self.file_manager.create_file(
-            file_path=f"{self.current_directory}/src/domain/models/entities/{name_table}/{name_table}_save.py",
-            content=entity_save,
+        if not self.directory_exists(folder_path=base_path):
+            return False
+        print(base_path)
+        self.directory_manager.create_directory(dir_path=base_path)
+
+        file_contents: dict[str, str] = {
+            f"{name_table}.py": self.create_entity_base(name_table=name_table),
+            f"{name_table}_save.py": self.create_entity_save(name_table=name_table),
+            f"{name_table}_read.py": self.create_entity_read(name_table=name_table),
+            f"{name_table}_delete.py": self.create_entity_delete(name_table=name_table),
+            f"{name_table}_update.py": self.create_entity_update(name_table=name_table),
+            "__init__.py": "",
+        }
+
+        for file_name, content in file_contents.items():
+            file_path = os.path.join(base_path, file_name)
+            self.file_manager.create_file(file_path=file_path, content=content)
+
+        return True
+
+    def domain_services_repositories_entities(self, name_table: str) -> bool:
+        base_path = os.path.join(
+            self.current_directory,
+            "src",
+            "domain",
+            "services",
+            "repositories",
+            "entities",
         )
-        entity_read = self.create_entity_read(name_table=name_table)
-        self.file_manager.create_file(
-            file_path=f"{self.current_directory}/src/domain/models/entities/{name_table}/{name_table}_read.py",
-            content=entity_read,
-        )
-        entity_delete = self.create_entity_delete(name_table=name_table)
-        self.file_manager.create_file(
-            file_path=f"{self.current_directory}/src/domain/models/entities/{name_table}/{name_table}_delete.py",
-            content=entity_delete,
-        )
-        entity_update = self.create_entity_update(name_table=name_table)
-        self.file_manager.create_file(
-            file_path=f"{self.current_directory}/src/domain/models/entities/{name_table}/{name_table}_update.py",
-            content=entity_update,
-        )
-        self.file_manager.create_file(
-            file_path=f"{self.current_directory}/src/domain/models/entities/{name_table}/__init__.py"
-        )
+        if not self.file_exists(file_path=f"{base_path}/i_{name_table}_repository.py"):
+            return False
+
+        file_contents: dict[str, str] = {
+            f"i_{name_table}_repository.py": self.create_domain_services_repositories_entities(
+                name_table=name_table
+            )
+        }
+
+        for file_name, content in file_contents.items():
+            file_path = os.path.join(base_path, file_name)
+            self.file_manager.create_file(file_path=file_path, content=content)
 
         return True
 
@@ -105,10 +120,8 @@ class MjolnirBusiness:
             return False
         return True
 
-    def directory_exists_entities(self, name_table: str):
-        folder_path = (
-            f"{self.current_directory}/src/domain/models/entities/{name_table}"
-        )
+    def directory_exists(self, folder_path: str):
+
         directory_exists = self.directory_manager.directory_exists(dir_path=folder_path)
 
         if directory_exists:
@@ -121,10 +134,21 @@ class MjolnirBusiness:
             return False
         return True
 
-    def create_directory_entity(self, name_table: str):
-        folder_path = (
-            f"{self.current_directory}/src/domain/models/entities/{name_table}"
-        )
+    def file_exists(self, file_path: str):
+
+        directory_exists = self.file_manager.file_exists(file_path=file_path)
+
+        if directory_exists:
+            print(
+                colored(
+                    f"ERROR: 002 Ejecución no completada - archivo {file_path} ya existe en la arquitectura",
+                    "light_red",
+                )
+            )
+            return False
+        return True
+
+    def create_directory(self, folder_path: str):
         self.directory_manager.create_directory(dir_path=folder_path)
 
     def create_entity_base(self, name_table: str):
@@ -148,6 +172,66 @@ class MjolnirBusiness:
         model_code += (
             "        return super().model_dump(*args, exclude=exclude, **kwargs)\n"
         )
+
+        return model_code
+
+    def create_domain_services_repositories_entities(self, name_table: str):
+        pascal_name_table = snake_to_pascal(snake_str=name_table)
+
+        model_code = f"""
+from typing import List, Union
+from abc import ABC, abstractmethod
+
+from src.core.models.config import Config
+from src.core.models.filter import Pagination
+from src.domain.models.entities.{name_table}.{name_table} import {pascal_name_table}
+from src.domain.models.entities.{name_table}.{name_table}_delete import {pascal_name_table}Delete
+from src.domain.models.entities.{name_table}.{name_table}_read import {pascal_name_table}Read
+from src.domain.models.entities.{name_table}.{name_table}_update import {pascal_name_table}Update
+from src.infrastructure.database.entities.{name_table}_entity import {pascal_name_table}Entity
+
+
+class I{pascal_name_table}Repository(ABC):
+    @abstractmethod
+    def save(
+        self,
+        config: Config,
+        params: {pascal_name_table}Entity,
+    ) -> Union[{pascal_name_table}, None]:
+        pass
+
+    @abstractmethod
+    def update(
+        self,
+        config: Config,
+        params: {pascal_name_table}Update,
+    ) -> Union[{pascal_name_table}, None]:
+        pass
+
+    @abstractmethod
+    def list(
+        self,
+        config: Config,
+        params: Pagination,
+    ) -> Union[List[{pascal_name_table}], None]:
+        pass
+
+    @abstractmethod
+    def delete(
+        self,
+        config: Config,
+        params: {pascal_name_table}Delete,
+    ) -> Union[{pascal_name_table}, None]:
+        pass
+
+    @abstractmethod
+    def read(
+        self,
+        config: Config,
+        params: {pascal_name_table}Read,
+    ) -> Union[{pascal_name_table}, None]:
+        pass
+        """
 
         return model_code
 
