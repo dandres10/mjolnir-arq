@@ -52,7 +52,7 @@ class MjolnirBusiness:
         if not result:
             return
 
-        result = self.domain_models_entities(name_table=name_table)
+        """ result = self.domain_models_entities(name_table=name_table)
         if not result:
             return
 
@@ -69,6 +69,10 @@ class MjolnirBusiness:
             return
 
         result = self.infrastructure_database_mappers(name_table=name_table)
+        if not result:
+            return """
+
+        result = self.infrastructure_database_repositories(name_table=name_table)
         if not result:
             return
 
@@ -176,7 +180,7 @@ __all__ = [
         }
 
         for file_name, content in file_contents.items():
-            file_path = os.path.join(base_path, file_name)
+            file_path = os.path.join(f"{base_path}/{name_table}", file_name)
             self.file_manager.create_file(file_path=file_path, content=content)
 
         return True
@@ -240,6 +244,142 @@ __all__ = [
             if postgres in postgres_type_str:
                 return postgres_type_str.replace(postgres, sqlalchemy)
         return postgres_type_str
+
+    def infrastructure_database_repositories(self, name_table: str):
+        pascal_name_table = snake_to_pascal(snake_str=name_table)
+        base_path = os.path.join(
+            self.current_directory, "src", "infrastructure", "database", "repositories"
+        )
+        if not self.file_exists(file_path=f"{base_path}/{name_table}_repository.py"):
+            return False
+
+        model_code = f"""
+from typing import List, Union
+from pydantic import UUID4
+from src.core.config import settings
+from src.core.enums.layer import LAYER
+from src.core.methods.get_filter import get_filter
+from src.core.models.config import Config
+from src.core.models.filter import Pagination
+from src.core.wrappers.execute_transaction import execute_transaction
+from src.domain.models.entities.{name_table}.index import (
+    {pascal_name_table},
+    {pascal_name_table}Delete,
+    {pascal_name_table}Read,
+    {pascal_name_table}Update,
+)
+from src.domain.services.repositories.entities.i_{name_table}_repository import (
+    I{pascal_name_table}Repository,
+)
+from src.infrastructure.database.entities.{name_table}_entity import {pascal_name_table}Entity
+from src.infrastructure.database.mappers.{name_table}_mapper import (
+    map_to_{name_table},
+    map_to_list_{name_table},
+)
+
+
+class {pascal_name_table}Repository(I{pascal_name_table}Repository):
+
+    def save(self, config: Config, params: {pascal_name_table}Entity) -> Union[{pascal_name_table}, None]:
+        db = config.db
+        db.add(params)
+        db.commit()
+        db.refresh(params)
+        return map_to_{name_table}(params)
+
+    def update(self, config: Config, params: {pascal_name_table}Update) -> Union[{pascal_name_table}, None]:
+        db = config.db
+
+        {name_table}: {pascal_name_table}Entity = (
+            db.query({pascal_name_table}Entity).filter({pascal_name_table}Entity.id == params.id).first()
+        )
+
+        if not {name_table}:
+            return None
+
+        update_data = params.model_dump(exclude_unset=True)
+        for key, value in update_data.items():
+            setattr({name_table}, key, value)
+
+        db.commit()
+        db.refresh({name_table})
+        return map_to_{name_table}({name_table})
+
+    def list(self, config: Config, params: Pagination) -> Union[List[{pascal_name_table}], None]:
+        db = config.db
+        query = db.query({pascal_name_table}Entity)
+
+        if params.all_data:
+            {name_table}s = query.all()
+        else:
+            if params.filters:
+                query = get_filter(
+                    query=query, filters=params.filters, entity={pascal_name_table}Entity
+                )
+                {name_table}s = query.offset(params.skip).limit(params.limit).all()
+
+        if not {name_table}s:
+            return None
+        return map_to_list_{name_table}({name_table}s)
+
+    def delete(
+        self,
+        config: Config,
+        params: {pascal_name_table}Delete,
+    ) -> Union[{pascal_name_table}, None]:
+        db = config.db
+        {name_table}: {pascal_name_table}Entity = (
+            db.query({pascal_name_table}Entity).filter({pascal_name_table}Entity.id == params.id).first()
+        )
+
+        if not {name_table}:
+            return None
+
+        db.delete({name_table})
+        db.commit()
+        return map_to_{name_table}({name_table})
+
+    def read(
+        self,
+        config: Config,
+        params: {pascal_name_table}Read,
+    ) -> Union[{pascal_name_table}, None]:
+        db = config.db
+        {name_table}: {pascal_name_table}Entity = (
+            db.query({pascal_name_table}Entity).filter({pascal_name_table}Entity.id == params.id).first()
+        )
+
+        if not {name_table}:
+            return None
+
+        return map_to_{name_table}({name_table})
+
+
+if settings.has_track:
+    {pascal_name_table}Repository.save = execute_transaction(LAYER.I_D_R.value)(
+        {pascal_name_table}Repository.save
+    )
+    {pascal_name_table}Repository.update = execute_transaction(LAYER.I_D_R.value)(
+        {pascal_name_table}Repository.update
+    )
+    {pascal_name_table}Repository.list = execute_transaction(LAYER.I_D_R.value)(
+        {pascal_name_table}Repository.list
+    )
+    {pascal_name_table}Repository.delete = execute_transaction(LAYER.I_D_R.value)(
+        LanguageRepository.delete
+    )
+    {pascal_name_table}Repository.read = execute_transaction(LAYER.I_D_R.value)(
+        LanguageRepository.read
+    )
+        """
+
+        file_contents: dict[str, str] = {f"{name_table}_repository.py": model_code}
+
+        for file_name, content in file_contents.items():
+            file_path = os.path.join(base_path, file_name)
+            self.file_manager.create_file(file_path=file_path, content=content)
+
+        return True
 
     def infrastructure_database_mappers(self, name_table: str):
         pascal_name_table = snake_to_pascal(snake_str=name_table)
