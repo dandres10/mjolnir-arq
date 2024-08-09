@@ -40,9 +40,9 @@ class MjolnirController:
 
         if selected_option == "Crear flujo base":
             self.mjolnir_business.create_flow_base()
-        elif selected_option == "Opción 2":
+        elif selected_option == "Crear arquitectura inicial":
             print("Has seleccionado la Opción 2.")
-        elif selected_option == "Opción 3":
+        elif selected_option == "Crear flujo de negocio":
             print("Has seleccionado la Opción 3.")
         elif selected_option == "Salir":
             print("Saliendo...")

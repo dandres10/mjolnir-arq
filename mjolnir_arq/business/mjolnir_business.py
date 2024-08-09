@@ -4,7 +4,7 @@ from termcolor import colored
 from sqlalchemy import BOOLEAN, TIMESTAMP, UUID, VARCHAR
 from InquirerPy import inquirer
 from mjolnir_arq.core.databases.connection_postgresql import ConnectionPostgresql
-from mjolnir_arq.core.methods.methods import snake_to_pascal
+from mjolnir_arq.core.methods.methods import convert_to_kebab_case, snake_to_pascal
 from mjolnir_arq.core.models.directory_manager import DirectoryManager
 from mjolnir_arq.core.models.file_manager import FileManager
 from mjolnir_arq.core.models.login_db import LoginDB
@@ -52,7 +52,7 @@ class MjolnirBusiness:
         if not result:
             return
 
-        """ result = self.domain_models_entities(name_table=name_table)
+        result = self.domain_models_entities(name_table=name_table)
         if not result:
             return
 
@@ -70,9 +70,21 @@ class MjolnirBusiness:
 
         result = self.infrastructure_database_mappers(name_table=name_table)
         if not result:
-            return """
+            return
 
         result = self.infrastructure_database_repositories(name_table=name_table)
+        if not result:
+            return
+
+        result = self.infrastructure_web_controller_entities(name_table=name_table)
+        if not result:
+            return
+
+        result = self.infrastructure_web_entities_routes(name_table=name_table)
+        if not result:
+            return
+
+        result = self.infrastructure_web_routes(name_table=name_table)
         if not result:
             return
 
@@ -378,6 +390,221 @@ if settings.has_track:
         for file_name, content in file_contents.items():
             file_path = os.path.join(base_path, file_name)
             self.file_manager.create_file(file_path=file_path, content=content)
+
+        return True
+
+    def infrastructure_web_controller_entities(self, name_table: str):
+        pascal_name_table = snake_to_pascal(snake_str=name_table)
+        base_path = os.path.join(
+            self.current_directory,
+            "src",
+            "infrastructure",
+            "web",
+            "controller",
+            "entities",
+        )
+        if not self.file_exists(file_path=f"{base_path}/{name_table}_controller.py"):
+            return False
+
+        model_code = f"""
+from src.core.config import settings
+from src.core.enums.layer import LAYER
+from src.core.models.config import Config
+from src.core.models.filter import Pagination
+from src.core.models.response import Response
+from src.core.wrappers.execute_transaction import execute_transaction
+from src.domain.models.entities.{name_table}.index import (
+    {pascal_name_table}Delete,
+    {pascal_name_table}Read,
+    {pascal_name_table}Save,
+    {pascal_name_table}Update,
+)
+from src.domain.services.use_cases.entities.{name_table}.index import (
+    {pascal_name_table}DeleteUseCase,
+    {pascal_name_table}ListUseCase,
+    {pascal_name_table}ReadUseCase,
+    {pascal_name_table}SaveUseCase,
+    {pascal_name_table}UpdateUseCase,
+)
+from src.infrastructure.database.repositories.{name_table}_repository import (
+    {pascal_name_table}Repository,
+)
+
+{name_table}_repository = {pascal_name_table}Repository()
+
+
+class {pascal_name_table}Controller:
+    def __init__(self) -> None:
+        self.{name_table}_save_use_case = {pascal_name_table}SaveUseCase({name_table}_repository)
+        self.{name_table}_update_use_case = {pascal_name_table}UpdateUseCase({name_table}_repository)
+        self.{name_table}_list_use_case = {pascal_name_table}ListUseCase({name_table}_repository)
+        self.{name_table}_delete_use_case = {pascal_name_table}DeleteUseCase({name_table}_repository)
+        self.{name_table}_read_use_case = {pascal_name_table}ReadUseCase({name_table}_repository)
+
+    def save(self, config: Config, params: {pascal_name_table}Save) -> Response:
+        result_save = self.{name_table}_save_use_case.execute(config, params)
+        if isinstance(result_save, str):
+            return Response.error(None, result_save)
+        return Response.success_temporary_message(
+            response=result_save, message="Información guarda"
+        )
+
+    def update(self, config: Config, params: {pascal_name_table}Update) -> Response:
+        result_update = self.{name_table}_update_use_case.execute(config, params)
+        if isinstance(result_update, str):
+            return Response.error(None, result_update)
+        return Response.success_temporary_message(
+            response=result_update, message="Información actualizada"
+        )
+
+    def list(self, config: Config, params: Pagination) -> Response:
+        result_list = self.{name_table}_list_use_case.execute(config, params)
+        if isinstance(result_list, str):
+            return Response.error(None, result_list)
+        return Response.success_temporary_message(
+            response=result_list, message="Consulta realizada"
+        )
+
+    def delete(self, config: Config, params: {pascal_name_table}Delete) -> Response:
+        result_delete = self.{name_table}_delete_use_case.execute(config, params)
+        if isinstance(result_delete, str):
+            return Response.error(None, result_delete)
+        return Response.success_temporary_message(
+            response=result_delete, message="Eliminación realizada"
+        )
+
+    def read(self, config: Config, params: {pascal_name_table}Read) -> Response:
+        result_delete = self.{name_table}_read_use_case.execute(config, params)
+        if isinstance(result_delete, str):
+            return Response.error(None, result_delete)
+        return Response.success_temporary_message(
+            response=result_delete, message="Consulta realizada"
+        )
+
+
+if settings.has_track:
+    {pascal_name_table}Controller.save = execute_transaction(LAYER.I_W_C_E.value)(
+        {pascal_name_table}Controller.save
+    )
+    {pascal_name_table}Controller.update = execute_transaction(LAYER.I_W_C_E.value)(
+        {pascal_name_table}Controller.update
+    )
+    {pascal_name_table}Controller.list = execute_transaction(LAYER.I_W_C_E.value)(
+        {pascal_name_table}Controller.list
+    )
+    {pascal_name_table}Controller.delete = execute_transaction(LAYER.I_W_C_E.value)(
+        {pascal_name_table}Controller.delete
+    )
+    {pascal_name_table}Controller.read = execute_transaction(LAYER.I_W_C_E.value)(
+        {pascal_name_table}Controller.read
+    )
+
+        """
+
+        file_contents: dict[str, str] = {f"{name_table}_controller.py": model_code}
+
+        for file_name, content in file_contents.items():
+            file_path = os.path.join(base_path, file_name)
+            self.file_manager.create_file(file_path=file_path, content=content)
+
+        return True
+
+    def infrastructure_web_entities_routes(self, name_table: str):
+        pascal_name_table = snake_to_pascal(snake_str=name_table)
+        text_id = '"/{id}"'
+        base_path = os.path.join(
+            self.current_directory, "src", "infrastructure", "web", "entities_routes"
+        )
+        if not self.file_exists(file_path=f"{base_path}/{name_table}_router.py"):
+            return False
+
+        model_code = f"""
+from pydantic import UUID4
+from src.core.models.config import Config
+from src.core.models.filter import Pagination
+from src.core.models.response import Response
+from fastapi import APIRouter, Depends, status
+from src.core.methods.get_config import get_config
+from src.domain.models.entities.{name_table}.index import (
+    {pascal_name_table}Delete,
+    {pascal_name_table}Read,
+    {pascal_name_table}Save,
+    {pascal_name_table}Update,
+)
+from src.infrastructure.web.controller.entities.{name_table}_controller import (
+    {pascal_name_table}Controller,
+)
+
+
+{name_table}_router = APIRouter(
+    prefix="/{convert_to_kebab_case(snake_str=name_table)}", tags=["{pascal_name_table}"], responses={{404: {{"description": "Not found"}}}}
+)
+
+{name_table}_controller = {pascal_name_table}Controller()
+
+
+@{name_table}_router.post("", status_code=status.HTTP_200_OK, response_model=Response)
+async def save(params: {pascal_name_table}Save, config: Config = Depends(get_config)) -> Response:
+    return {name_table}_controller.save(config, params)
+
+
+@{name_table}_router.put("", status_code=status.HTTP_200_OK, response_model=Response)
+async def update(
+    params: {pascal_name_table}Update, config: Config = Depends(get_config)
+) -> Response:
+    return {name_table}_controller.update(config, params)
+
+
+@{name_table}_router.post(
+    "/list", status_code=status.HTTP_200_OK, response_model=Response
+)
+async def list(params: Pagination, config: Config = Depends(get_config)) -> Response:
+    return {name_table}_controller.list(config, params)
+
+
+@{name_table}_router.delete(
+    {text_id}, status_code=status.HTTP_200_OK, response_model=Response
+)
+async def delete(id: UUID4, config: Config = Depends(get_config)) -> Response:
+    build_params = {pascal_name_table}Delete(id=id)
+    return {name_table}_controller.delete(config, params=build_params)
+
+
+@{name_table}_router.get({text_id}, status_code=status.HTTP_200_OK, response_model=Response)
+async def read(id: UUID4, config: Config = Depends(get_config)) -> Response:
+    build_params = {pascal_name_table}Read(id=id)
+    return {name_table}_controller.read(config, params=build_params)
+
+    """
+
+        file_contents: dict[str, str] = {f"{name_table}_router.py": model_code}
+
+        for file_name, content in file_contents.items():
+            file_path = os.path.join(base_path, file_name)
+            self.file_manager.create_file(file_path=file_path, content=content)
+
+        return True
+
+    def infrastructure_web_routes(self, name_table: str):
+        base_path = os.path.join(
+            self.current_directory, "src", "infrastructure", "web", "routes"
+        )
+        filename = f"{base_path}/route.py"
+
+        import_comment = "# imports"
+        new_import_line = f"from src.infrastructure.web.entities_routes.{name_table}_router import {name_table}_router"
+
+        include_router_comment = "# include_router"
+        new_include_router_line = f"        app.include_router({name_table}_router)"
+
+        self.file_manager.add_line_to_file(
+            filename=filename, comment=import_comment, new_line=new_import_line
+        )
+        self.file_manager.add_line_to_file(
+            filename=filename,
+            comment=include_router_comment,
+            new_line=new_include_router_line,
+        )
 
         return True
 

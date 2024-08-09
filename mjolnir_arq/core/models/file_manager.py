@@ -52,3 +52,22 @@ class FileManager:
 
     def file_exists(self, file_path: str):
         return os.path.exists(file_path)
+
+    def add_line_to_file(self, filename, comment, new_line):
+
+        with open(filename, "r") as file:
+            lines = file.readlines()
+
+        insert_index = None
+        for i, line in enumerate(lines):
+            if comment in line:
+                insert_index = i
+                break
+
+        if insert_index is not None and new_line not in lines:
+            lines.insert(insert_index + 1, new_line + "\n")
+
+        with open(filename, "w") as file:
+            file.writelines(lines)
+
+        print(colored(f"SUCCESS: archivo '{filename}' actualizado con éxito.", "cyan"))
